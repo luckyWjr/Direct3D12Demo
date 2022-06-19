@@ -13,6 +13,8 @@
 #include <DirectXMath.h>
 #include <DirectXColors.h>
 
+using Microsoft::WRL::ComPtr;
+
 class d3d12Util
 {
 public:
@@ -22,7 +24,9 @@ public:
         return (byteSize + 255) & ~255;
     }
 
-    static Microsoft::WRL::ComPtr<ID3DBlob> LoadBinary(const std::wstring& filename);
+    static ComPtr<ID3DBlob> LoadBinary(const std::wstring& filename);
+    static ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const void* data,
+        const int size, ComPtr<ID3D12Resource>& uploadBuffer);
 };
 
 class DxException

@@ -209,10 +209,6 @@ double m_secondsPerCount;
 
 void InitAsset()
 {
-    __int64 countsPerSec;
-    QueryPerformanceFrequency((LARGE_INTEGER*)&countsPerSec);
-    m_secondsPerCount = 1.0 / (double)countsPerSec;
-
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -220,52 +216,49 @@ void InitAsset()
     };
     D3D12_INPUT_LAYOUT_DESC inputLayout = { inputElementDescs, _countof(inputElementDescs) };
 
-    // 注意顶点顺序，逆时针了你就看不见了
-    Vertex triangleVertices[] =
-    {        
-        { { 0.0f, 0.5f, 0.0f }, XMFLOAT4(Colors::Red) },
-        { { 0.5f, -0.5f, 0.0f }, XMFLOAT4(Colors::Green)},
-        { { -0.5f, -0.5f, 0.0f }, XMFLOAT4(Colors::Blue) },
+    Vertex vertices[] =
+    {
+        { { -0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Red) },     // left-bottom-front
+        { { -0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Yellow) },   // left-up-front
+        { { 0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Green) },     // right-up-front
+        { { 0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Orange) },   // right-bottom-front
+        { { -0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::Pink) },     // left-bottom-back
+        { { -0.5f, 0.5f, 0.5f }, XMFLOAT4(Colors::Blue) },      // left-up-back
+        { { 0.5f, 0.5f, 0.5f }, XMFLOAT4(Colors::Black) },      // right-up-back
+        { { 0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::White) },     // right-bottom-back
     };
 
-    // 确保传输数据操作的Command被执行后，可以释放upload heap的resource，通过ComPtr会自动Release
-    ComPtr<ID3D12Resource> vertexUploadBuffer;
-
-    const UINT triangleVerticesSize = sizeof(triangleVertices);
-    ThrowIfFailed(m_device->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-        D3D12_HEAP_FLAG_NONE,
-        &CD3DX12_RESOURCE_DESC::Buffer(triangleVerticesSize),
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(&m_vertexBuffer)));
-
-    ThrowIfFailed(m_device->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-        D3D12_HEAP_FLAG_NONE,
-        &CD3DX12_RESOURCE_DESC::Buffer(triangleVerticesSize),
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&vertexUploadBuffer)));
-
-    // 设置要传输的CPU数据
-    D3D12_SUBRESOURCE_DATA subResourceData = {};
-    subResourceData.pData = triangleVertices;
-    subResourceData.RowPitch = triangleVerticesSize;
-    subResourceData.SlicePitch = subResourceData.RowPitch;
+    Vertex cubeVertices[] =
+    {
+        // front face
+        vertices[0], vertices[1], vertices[2],
+        vertices[0], vertices[2], vertices[3],
+        // back face
+        vertices[4], vertices[6], vertices[5],
+        vertices[4], vertices[7], vertices[6],
+        // left face
+        vertices[4], vertices[5], vertices[1],
+        vertices[4], vertices[1], vertices[0],
+        // right face
+        vertices[3], vertices[2], vertices[6],
+        vertices[3], vertices[6], vertices[7],
+        // top face
+        vertices[1], vertices[5], vertices[6],
+        vertices[1], vertices[6], vertices[2],
+        // bottom face
+        vertices[4], vertices[0], vertices[3],
+        vertices[4], vertices[3], vertices[7],
+    };
 
     m_commandList->Reset(m_commandAllocator.Get(), nullptr); // 之前close了command list，这里要使用到，需要reset操作才可记录command。
 
-    // 传输前要更改resource的state
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.Get(),
-        D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-    // 会先将CPU内存数据拷贝到upload heap中，然后再通过ID3D12CommandList::CopySubresourceRegion从upload heap中拷贝到default buffer中
-    UpdateSubresources<1>(m_commandList.Get(), m_vertexBuffer.Get(), vertexUploadBuffer.Get(), 0, 0, 1, &subResourceData);
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.Get(),
-        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+    // 确保传输数据操作的Command被执行后，可以释放upload heap的resource，通过ComPtr会自动Release
+    ComPtr<ID3D12Resource> vertexUploadBuffer;
+    const UINT cubeVerticesSize = sizeof(cubeVertices);
+    m_vertexBuffer = d3d12Util::CreateDefaultBuffer(m_device.Get(), m_commandList.Get(), cubeVertices, cubeVerticesSize, vertexUploadBuffer);
 
     m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-    m_vertexBufferView.SizeInBytes = triangleVerticesSize;
+    m_vertexBufferView.SizeInBytes = cubeVerticesSize;
     m_vertexBufferView.StrideInBytes = sizeof(Vertex);
 
     // 创建一个空的root signature
@@ -348,7 +341,7 @@ void PopulateCommandList()
     m_commandList->ClearRenderTargetView(rtvHandle, Colors::Gray, 0, nullptr);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-    m_commandList->DrawInstanced(3, 1, 0, 0);
+    m_commandList->DrawInstanced(36, 1, 0, 0);
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_swapChainBuffer[m_currendBackBufferIndex].Get(),
         D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -360,8 +353,6 @@ void OnUpdate()
 {
 }
 
-int i = 0;
-
 void OnRender()
 {
     PopulateCommandList();
@@ -370,25 +361,11 @@ void OnRender()
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-
-    DXGI_FRAME_STATISTICS sta;
-    m_swapChain->GetFrameStatistics(&sta);
-    i = i % 4;
-    std::wstring text = L"before Present = " + std::to_wstring(i + 1) + L"  PresentCount = " + std::to_wstring(sta.PresentCount) + L"  PresentRefreshCount = " + std::to_wstring(sta.PresentRefreshCount) + L"\n";
-    OutputDebugString(text.c_str());
-    __int64 startTime;
-    QueryPerformanceCounter((LARGE_INTEGER*)&startTime);
-
     // surface flipping
     ThrowIfFailed(m_swapChain->Present(1, 0));
     m_currendBackBufferIndex = (m_currendBackBufferIndex + 1) % m_swapChainBufferCount;
 
     FlushCommandQueue();
-
-    __int64 endTime;
-    QueryPerformanceCounter((LARGE_INTEGER*)&endTime);
-    std::wstring timetext = L"Time = " + std::to_wstring((endTime - startTime) * m_secondsPerCount) + L"\n";
-    OutputDebugString(timetext.c_str());
 }
 
 void OnDestroy()
