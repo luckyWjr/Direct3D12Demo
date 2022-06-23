@@ -255,7 +255,7 @@ void InitAsset()
     // 确保传输数据操作的Command被执行后，可以释放upload heap的resource，通过ComPtr会自动Release
     ComPtr<ID3D12Resource> vertexUploadBuffer;
     const UINT cubeVerticesSize = sizeof(cubeVertices);
-    m_vertexBuffer = d3d12Util::CreateDefaultBuffer(m_device.Get(), m_commandList.Get(), cubeVertices, cubeVerticesSize, vertexUploadBuffer);
+    m_vertexBuffer = d3d12Util::CreateDefaultHeapBuffer(m_device.Get(), m_commandList.Get(), cubeVertices, cubeVerticesSize, vertexUploadBuffer);
 
     m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
     m_vertexBufferView.SizeInBytes = cubeVerticesSize;

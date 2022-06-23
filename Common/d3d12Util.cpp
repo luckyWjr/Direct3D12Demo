@@ -35,7 +35,7 @@ ComPtr<ID3DBlob> d3d12Util::LoadBinary(const std::wstring& filename)
     return blob;
 }
 
-ComPtr<ID3D12Resource> d3d12Util::CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const void* data,
+ComPtr<ID3D12Resource> d3d12Util::CreateDefaultHeapBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const void* data,
     const int size, ComPtr<ID3D12Resource>& uploadBuffer)
 {
     ComPtr<ID3D12Resource> defaultBuffer;
