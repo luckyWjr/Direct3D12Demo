@@ -10,7 +10,7 @@ public:
     {
         m_elementByteSize = sizeof(T);
         if (isConstantBuffer)
-            //m_elementByteSize = d3d12Util::CalcConstantBufferByteSize(sizeof(T));
+            m_elementByteSize = d3d12Util::CalcConstantBufferByteSize(sizeof(T));
 
         ThrowIfFailed(device->CreateCommittedResource(
             &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
@@ -18,9 +18,9 @@ public:
             &CD3DX12_RESOURCE_DESC::Buffer(m_elementByteSize * elementCount),
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
-            IID_PPV_ARGS(&m_uploadBuffer)));
+            IID_PPV_ARGS(&m_uploadHeapBuffer)));
 
-        ThrowIfFailed(m_uploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedData)));
+        ThrowIfFailed(m_uploadHeapBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedData)));
     }
 
     UploadHeapBuffer(const UploadHeapBuffer& rhs) = delete;
@@ -46,7 +46,6 @@ public:
 private:
     ComPtr<ID3D12Resource> m_uploadHeapBuffer;
     BYTE* m_mappedData = nullptr;
-
     UINT m_elementByteSize = 0;
     bool m_isConstantBuffer = false;
 };
