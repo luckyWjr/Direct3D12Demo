@@ -1,15 +1,34 @@
 #include <windows.h>
 #include "../Common/d3d12Util.h"
+#include "../Common/UploadDefaultBuffer.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
+
+// 顶点数据
+struct Vertex
+{
+    XMFLOAT3 position;
+    XMFLOAT4 color;
+};
+
+struct ObjectConstant
+{
+    XMFLOAT4X4 modelMatrix = MathUtil::Identity4x4();
+};
+
+struct PassConstant
+{
+    XMFLOAT4X4 viewMatrix = MathUtil::Identity4x4();
+    XMFLOAT4X4 projectMatrix = MathUtil::Identity4x4();
+};
 
 UINT m_clientWidth = 800, m_clientHeight = 600;     // 窗口尺寸
 HWND m_hwnd;
 UINT64 m_fenceValue;
 static const UINT m_swapChainBufferCount = 2;
 HANDLE m_fenceEvent;
-UINT m_rtvDescriptorSize;
+UINT m_rtvDescriptorSize, m_cbvSrvUavDescriptorSize;
 UINT m_currendBackBufferIndex = 0;
 
 DXGI_FORMAT m_backBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;  // 每个元素占用8-bit，值的范围[0,1]
@@ -23,36 +42,31 @@ ComPtr<IDXGISwapChain> m_swapChain;
 ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 ComPtr<ID3D12Resource> m_swapChainBuffer[m_swapChainBufferCount];
 ComPtr<ID3D12RootSignature> m_rootSignature;
-ComPtr<ID3D12Resource> m_vertexBuffer;
+ComPtr<ID3D12Resource> m_vertexBuffer, m_indexBuffer;
+std::unique_ptr<UploadHeapBuffer<ObjectConstant>> m_objectConstantBuffer;
+std::unique_ptr<UploadHeapBuffer<PassConstant>> m_passConstantBuffer;
+ComPtr<ID3D12DescriptorHeap> m_CBVHeap;
 ComPtr<ID3DBlob> m_vsByteCode;
 ComPtr<ID3DBlob> m_psByteCode;
 ComPtr<ID3D12PipelineState> m_pipelineState;
 
 D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 D3D12_VIEWPORT m_viewport;
 D3D12_RECT m_scissorRect;
-
-// 顶点数据
-struct Vertex
-{
-    XMFLOAT3 position;
-    XMFLOAT4 color;
-};
-
-struct ObjectConstants
-{
-    XMFLOAT4X4 ModelMatrix = MathUtil::Identity4x4();
-};
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 void InitDirect3D();
 void InitAsset();
+void InitStaticObject();
 void FlushCommandQueue();
+void CreateRootSignature();
 void PopulateCommandList();
 void OnUpdate();
 void OnRender();
 void OnDestroy();
+
 
 // 应用程序入口函数
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
@@ -70,7 +84,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     m_hwnd = CreateWindowEx(
         0,                              // Optional window styles.
         CLASS_NAME,                     // Window class
-        L"Learn to Program Windows",    // Window text
+        L"Draw Geometries",    // Window text
         WS_OVERLAPPEDWINDOW,            // Window style
         CW_USEDEFAULT, CW_USEDEFAULT,   // 窗口大小
         m_clientWidth, m_clientHeight,  // 窗口位置
@@ -156,6 +170,9 @@ void InitDirect3D()
         ThrowIfFailed(D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)));
     }
 
+    m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    m_cbvSrvUavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
     // Command Queue，Command Allocator，Command List的type要一致
     D3D12_COMMAND_LIST_TYPE commandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -195,7 +212,6 @@ void InitDirect3D()
     rtvHeapDesc.NodeMask = 0;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
-    m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHeapHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
     for (UINT i = 0; i < m_swapChainBufferCount; i++)
     {
@@ -204,8 +220,6 @@ void InitDirect3D()
         rtvHeapHandle.Offset(1, m_rtvDescriptorSize);       // 偏移一个rtv大小
     }
 }
-
-double m_secondsPerCount;
 
 void InitAsset()
 {
@@ -216,7 +230,7 @@ void InitAsset()
     };
     D3D12_INPUT_LAYOUT_DESC inputLayout = { inputElementDescs, _countof(inputElementDescs) };
 
-    Vertex vertices[] =
+    Vertex cubeVertices[] =
     {
         { { -0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Red) },     // left-bottom-front
         { { -0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Yellow) },   // left-up-front
@@ -228,26 +242,68 @@ void InitAsset()
         { { 0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::White) },     // right-bottom-back
     };
 
-    Vertex cubeVertices[] =
+    //Vertex cubeVertices2[] =
+    //{
+    //    { { -0.5f - 1.0f, -0.5f - 1.0f, -0.5f }, XMFLOAT4(Colors::Red) },     // left-bottom-front
+    //    { { -0.5f - 1.0f, 0.5f - 1.0f, -0.5f }, XMFLOAT4(Colors::Yellow) },   // left-up-front
+    //    { { 0.5f - 1.0f, 0.5f - 1.0f, -0.5f }, XMFLOAT4(Colors::Green) },     // right-up-front
+    //    { { 0.5f - 1.0f, -0.5f - 1.0f, -0.5f }, XMFLOAT4(Colors::Orange) },   // right-bottom-front
+    //    { { -0.5f - 1.0f, -0.5f - 1.0f, 0.5f }, XMFLOAT4(Colors::Pink) },     // left-bottom-back
+    //    { { -0.5f - 1.0f, 0.5f - 1.0f, 0.5f }, XMFLOAT4(Colors::Blue) },      // left-up-back
+    //    { { 0.5f - 1.0f, 0.5f - 1.0f, 0.5f }, XMFLOAT4(Colors::Black) },      // right-up-back
+    //    { { 0.5f - 1.0f, -0.5f - 1.0f, 0.5f }, XMFLOAT4(Colors::White) },     // right-bottom-back
+    //};
+
+    //Vertex all[16];
+
+    //int k = 0;
+    //for (int i = 0; i < 8; i++, k++) {
+    //    all[k] = cubeVertices[i];
+    //}
+    //for (int i = 0; i < 8; i++, k++) {
+    //    all[k] = cubeVertices2[i];
+    //}
+
+    std::uint16_t cubeVertexIndices[] =
     {
         // front face
-        vertices[0], vertices[1], vertices[2],
-        vertices[0], vertices[2], vertices[3],
+        0, 1, 2,
+        0, 2, 3,
         // back face
-        vertices[4], vertices[6], vertices[5],
-        vertices[4], vertices[7], vertices[6],
+        4, 6, 5,
+        4, 7, 6,
         // left face
-        vertices[4], vertices[5], vertices[1],
-        vertices[4], vertices[1], vertices[0],
+        4, 5, 1,
+        4, 1, 0,
         // right face
-        vertices[3], vertices[2], vertices[6],
-        vertices[3], vertices[6], vertices[7],
+        3, 2, 6,
+        3, 6, 7,
         // top face
-        vertices[1], vertices[5], vertices[6],
-        vertices[1], vertices[6], vertices[2],
+        1, 5, 6,
+        1, 6, 2,
         // bottom face
-        vertices[4], vertices[0], vertices[3],
-        vertices[4], vertices[3], vertices[7],
+        4, 0, 3,
+        4, 3, 7,
+
+
+        //// front face
+        //0 + 8, 1 + 8, 2 + 8,
+        //0 + 8, 2 + 8, 3 + 8,
+        //// back face
+        //4 + 8, 6 + 8, 5 + 8,
+        //4 + 8, 7 + 8, 6 + 8,
+        //// left face
+        //4 + 8, 5 + 8, 1 + 8,
+        //4 + 8, 1 + 8, 0 + 8,
+        //// right face
+        //3 + 8, 2 + 8, 6 + 8,
+        //3 + 8, 6 + 8, 7 + 8,
+        //// top face
+        //1 + 8, 5 + 8, 6 + 8,
+        //1 + 8, 6 + 8, 2 + 8,
+        //// bottom face
+        //4 + 8, 0 + 8, 3 + 8,
+        //4 + 8, 3 + 8, 7 + 8,
     };
 
     m_commandList->Reset(m_commandAllocator.Get(), nullptr); // 之前close了command list，这里要使用到，需要reset操作才可记录command。
@@ -261,13 +317,38 @@ void InitAsset()
     m_vertexBufferView.SizeInBytes = cubeVerticesSize;
     m_vertexBufferView.StrideInBytes = sizeof(Vertex);
 
-    // 创建一个空的root signature
-    CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-    rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-    ComPtr<ID3DBlob> signature;
-    ComPtr<ID3DBlob> error;
-    ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-    ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+    ComPtr<ID3D12Resource> indexUploadBuffer;
+    const UINT cubeVertexIndicesSize = sizeof(cubeVertexIndices);
+    m_indexBuffer = d3d12Util::CreateDefaultHeapBuffer(m_device.Get(), m_commandList.Get(), cubeVertexIndices, cubeVertexIndicesSize, indexUploadBuffer);
+
+    m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+    m_indexBufferView.SizeInBytes = cubeVertexIndicesSize;
+    m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
+
+    // 创建constant buffer
+    m_objectConstantBuffer = std::make_unique<UploadHeapBuffer<ObjectConstant>>(m_device.Get(), 1, true);
+    m_passConstantBuffer = std::make_unique<UploadHeapBuffer<PassConstant>>(m_device.Get(), 1, true);
+
+    D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
+    cbvHeapDesc.NumDescriptors = 2;
+    cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    cbvHeapDesc.NodeMask = 0;
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_CBVHeap)));
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHeapHandle(m_CBVHeap->GetCPUDescriptorHandleForHeapStart());
+    D3D12_CONSTANT_BUFFER_VIEW_DESC objectCbvDesc;
+    objectCbvDesc.BufferLocation = m_objectConstantBuffer->Resource()->GetGPUVirtualAddress();
+    objectCbvDesc.SizeInBytes = d3d12Util::CalcConstantBufferByteSize(sizeof(ObjectConstant));
+    m_device->CreateConstantBufferView(&objectCbvDesc, cbvHeapHandle);
+    
+    cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
+    D3D12_CONSTANT_BUFFER_VIEW_DESC passCbvDesc;
+    passCbvDesc.BufferLocation = m_passConstantBuffer->Resource()->GetGPUVirtualAddress();
+    passCbvDesc.SizeInBytes = d3d12Util::CalcConstantBufferByteSize(sizeof(PassConstant));
+    m_device->CreateConstantBufferView(&passCbvDesc, cbvHeapHandle);
+
+    CreateRootSignature();
 
     // shader compiler
     m_vsByteCode = d3d12Util::LoadBinary(L"shaders_vs.cso");
@@ -301,6 +382,8 @@ void InitAsset()
     // 裁剪区域
     m_scissorRect = { 0, 0, (long)m_clientWidth, (long)m_clientHeight };
 
+    InitStaticObject();
+
     ThrowIfFailed(m_commandList->Close());
     ID3D12CommandList* cmdsLists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
@@ -309,6 +392,7 @@ void InitAsset()
 
 void FlushCommandQueue()
 {
+    if (m_commandQueue == nullptr) return;
     m_fenceValue++;
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValue));             // 添加一个指令到GPU，用来更新fence值
 
@@ -319,38 +403,54 @@ void FlushCommandQueue()
     }
 }
 
-void PopulateCommandList()
+
+void CreateRootSignature()
 {
-    // Reset上一帧使用的Command Allocator，用来存储当前帧要记录的Command
-    ThrowIfFailed(m_commandAllocator->Reset());
-    // Reset上一帧使用的Command List，重新记录当前帧的Command
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+    // 一个root signature定义一个root parameter数组
+    // 一个root parameter可以是root constant，root descriptor，descriptor table
+    CD3DX12_ROOT_PARAMETER rootParameters[2];
 
-    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    CD3DX12_DESCRIPTOR_RANGE objectCbvTable;
+    objectCbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);// 绑定到register(b0)上
 
-    // Command List Reset后，需要重新设置
-    m_commandList->RSSetViewports(1, &m_viewport);
-    m_commandList->RSSetScissorRects(1, &m_scissorRect);
+    CD3DX12_DESCRIPTOR_RANGE passCbvTable;
+    passCbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);// 绑定到register(b0)上
 
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_swapChainBuffer[m_currendBackBufferIndex].Get(),
-        D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    rootParameters[0].InitAsDescriptorTable(1, &objectCbvTable);// DescriptorTable: descriptor heap中连续的descriptor
+    rootParameters[1].InitAsDescriptorTable(1, &passCbvTable);
 
-    // 获取当前
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_currendBackBufferIndex, m_rtvDescriptorSize);
-    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-    m_commandList->ClearRenderTargetView(rtvHandle, Colors::Gray, 0, nullptr);
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-    m_commandList->DrawInstanced(36, 1, 0, 0);
+    CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+    rootSignatureDesc.Init(2, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+    ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+    ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_swapChainBuffer[m_currendBackBufferIndex].Get(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    // 为了性能，root signature要尽可能的小，并且在一帧里面尽量少的去改变它。
+}
 
-    ThrowIfFailed(m_commandList->Close());
+void InitStaticObject()
+{
+    ObjectConstant objConstants;
+    XMMATRIX modelMatrix = XMMATRIX(
+        2, 0, 0, 0,
+        0, 2, 0, 0,
+        0, 0, 2, 0,
+        0, 0, 0, 1);
+    XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
+    m_objectConstantBuffer->CopyData(0, objConstants);
 }
 
 void OnUpdate()
 {
+    PassConstant passConstants;
+    XMMATRIX projectMatrix = XMMATRIX(
+        0.7795, 0.8776, 0.8269, 0.8261,
+        0.0000, 1.2097, -0.4031, -0.4027,
+        -1.6342, 0.4185, 0.3944, 0.3940,
+        0.0000, 0.0000, 4.0040, 5.0000);
+    XMStoreFloat4x4(&passConstants.projectMatrix, XMMatrixTranspose(projectMatrix));
+    m_passConstantBuffer->CopyData(0, passConstants);
 }
 
 void OnRender()
@@ -366,6 +466,44 @@ void OnRender()
     m_currendBackBufferIndex = (m_currendBackBufferIndex + 1) % m_swapChainBufferCount;
 
     FlushCommandQueue();
+}
+
+void PopulateCommandList()
+{
+    // Reset上一帧使用的Command Allocator，用来存储当前帧要记录的Command
+    ThrowIfFailed(m_commandAllocator->Reset());
+    // Reset上一帧使用的Command List，重新记录当前帧的Command
+    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+
+    // Command List Reset后，需要重新设置
+    m_commandList->RSSetViewports(1, &m_viewport);
+    m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_swapChainBuffer[m_currendBackBufferIndex].Get(),
+        D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+    // 获取当前
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_currendBackBufferIndex, m_rtvDescriptorSize);
+    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+    m_commandList->ClearRenderTargetView(rtvHandle, Colors::Gray, 0, nullptr);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    m_commandList->IASetIndexBuffer(&m_indexBufferView);
+
+    ID3D12DescriptorHeap* descriptorHeaps[] = { m_CBVHeap.Get() };
+    m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    CD3DX12_GPU_DESCRIPTOR_HANDLE handle(m_CBVHeap->GetGPUDescriptorHandleForHeapStart());
+    m_commandList->SetGraphicsRootDescriptorTable(0, handle);
+    handle.Offset(m_cbvSrvUavDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(1, handle);
+
+    m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_swapChainBuffer[m_currendBackBufferIndex].Get(),
+        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+    ThrowIfFailed(m_commandList->Close());
 }
 
 void OnDestroy()
