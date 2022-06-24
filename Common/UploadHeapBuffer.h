@@ -9,6 +9,8 @@ public:
         m_isConstantBuffer(isConstantBuffer)
     {
         m_elementByteSize = sizeof(T);
+
+        // 如果是constant buffer，则每个元素（每个constant buffer）的大小与 256byte 对齐
         if (isConstantBuffer)
             m_elementByteSize = d3d12Util::CalcConstantBufferByteSize(sizeof(T));
 
@@ -43,7 +45,7 @@ public:
         memcpy(&m_mappedData[elementIndex * m_elementByteSize], &data, sizeof(T));
     }
 
-private:
+protected:
     ComPtr<ID3D12Resource> m_uploadHeapBuffer;
     BYTE* m_mappedData = nullptr;
     UINT m_elementByteSize = 0;

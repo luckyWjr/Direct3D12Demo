@@ -1,6 +1,6 @@
 #include <windows.h>
 #include "../Common/d3d12Util.h"
-#include "../Common/UploadDefaultBuffer.h"
+#include "../Common/UploadHeapConstantBuffer.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -43,8 +43,8 @@ ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 ComPtr<ID3D12Resource> m_swapChainBuffer[m_swapChainBufferCount];
 ComPtr<ID3D12RootSignature> m_rootSignature;
 ComPtr<ID3D12Resource> m_vertexBuffer, m_indexBuffer;
-std::unique_ptr<UploadHeapBuffer<ObjectConstant>> m_objectConstantBuffer;
-std::unique_ptr<UploadHeapBuffer<PassConstant>> m_passConstantBuffer;
+std::unique_ptr<UploadHeapConstantBuffer<ObjectConstant>> m_objectConstantBuffer;
+std::unique_ptr<UploadHeapConstantBuffer<PassConstant>> m_passConstantBuffer;
 ComPtr<ID3D12DescriptorHeap> m_CBVHeap;
 ComPtr<ID3DBlob> m_vsByteCode;
 ComPtr<ID3DBlob> m_psByteCode;
@@ -326,8 +326,8 @@ void InitAsset()
     m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 
     // ´´½¨constant buffer
-    m_objectConstantBuffer = std::make_unique<UploadHeapBuffer<ObjectConstant>>(m_device.Get(), 1, true);
-    m_passConstantBuffer = std::make_unique<UploadHeapBuffer<PassConstant>>(m_device.Get(), 1, true);
+    m_objectConstantBuffer = std::make_unique<UploadHeapConstantBuffer<ObjectConstant>>(m_device.Get(), 1);
+    m_passConstantBuffer = std::make_unique<UploadHeapConstantBuffer<PassConstant>>(m_device.Get(), 1);
 
     D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
     cbvHeapDesc.NumDescriptors = 2;
