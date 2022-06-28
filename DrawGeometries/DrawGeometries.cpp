@@ -55,10 +55,14 @@ D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 D3D12_VIEWPORT m_viewport;
 D3D12_RECT m_scissorRect;
 
+std::vector<Vertex> m_vertices;
+std::vector<std::uint16_t> m_indices;
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 void InitDirect3D();
 void InitAsset();
+void InitGeometries();
 void InitStaticObject();
 void FlushCommandQueue();
 void CreateRootSignature();
@@ -230,81 +234,7 @@ void InitAsset()
     };
     D3D12_INPUT_LAYOUT_DESC inputLayout = { inputElementDescs, _countof(inputElementDescs) };
 
-    Vertex cubeVertices[] =
-    {
-        { { -0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Red) },     // left-bottom-front
-        { { -0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Yellow) },   // left-up-front
-        { { 0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Green) },     // right-up-front
-        { { 0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Orange) },   // right-bottom-front
-        { { -0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::Pink) },     // left-bottom-back
-        { { -0.5f, 0.5f, 0.5f }, XMFLOAT4(Colors::Blue) },      // left-up-back
-        { { 0.5f, 0.5f, 0.5f }, XMFLOAT4(Colors::Black) },      // right-up-back
-        { { 0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::White) },     // right-bottom-back
-    };
-
-    //Vertex cubeVertices2[] =
-    //{
-    //    { { -0.5f - 1.0f, -0.5f - 1.0f, -0.5f }, XMFLOAT4(Colors::Red) },     // left-bottom-front
-    //    { { -0.5f - 1.0f, 0.5f - 1.0f, -0.5f }, XMFLOAT4(Colors::Yellow) },   // left-up-front
-    //    { { 0.5f - 1.0f, 0.5f - 1.0f, -0.5f }, XMFLOAT4(Colors::Green) },     // right-up-front
-    //    { { 0.5f - 1.0f, -0.5f - 1.0f, -0.5f }, XMFLOAT4(Colors::Orange) },   // right-bottom-front
-    //    { { -0.5f - 1.0f, -0.5f - 1.0f, 0.5f }, XMFLOAT4(Colors::Pink) },     // left-bottom-back
-    //    { { -0.5f - 1.0f, 0.5f - 1.0f, 0.5f }, XMFLOAT4(Colors::Blue) },      // left-up-back
-    //    { { 0.5f - 1.0f, 0.5f - 1.0f, 0.5f }, XMFLOAT4(Colors::Black) },      // right-up-back
-    //    { { 0.5f - 1.0f, -0.5f - 1.0f, 0.5f }, XMFLOAT4(Colors::White) },     // right-bottom-back
-    //};
-
-    //Vertex all[16];
-
-    //int k = 0;
-    //for (int i = 0; i < 8; i++, k++) {
-    //    all[k] = cubeVertices[i];
-    //}
-    //for (int i = 0; i < 8; i++, k++) {
-    //    all[k] = cubeVertices2[i];
-    //}
-
-    std::uint16_t cubeVertexIndices[] =
-    {
-        // front face
-        0, 1, 2,
-        0, 2, 3,
-        // back face
-        4, 6, 5,
-        4, 7, 6,
-        // left face
-        4, 5, 1,
-        4, 1, 0,
-        // right face
-        3, 2, 6,
-        3, 6, 7,
-        // top face
-        1, 5, 6,
-        1, 6, 2,
-        // bottom face
-        4, 0, 3,
-        4, 3, 7,
-
-
-        //// front face
-        //0 + 8, 1 + 8, 2 + 8,
-        //0 + 8, 2 + 8, 3 + 8,
-        //// back face
-        //4 + 8, 6 + 8, 5 + 8,
-        //4 + 8, 7 + 8, 6 + 8,
-        //// left face
-        //4 + 8, 5 + 8, 1 + 8,
-        //4 + 8, 1 + 8, 0 + 8,
-        //// right face
-        //3 + 8, 2 + 8, 6 + 8,
-        //3 + 8, 6 + 8, 7 + 8,
-        //// top face
-        //1 + 8, 5 + 8, 6 + 8,
-        //1 + 8, 6 + 8, 2 + 8,
-        //// bottom face
-        //4 + 8, 0 + 8, 3 + 8,
-        //4 + 8, 3 + 8, 7 + 8,
-    };
+    
 
     m_commandList->Reset(m_commandAllocator.Get(), nullptr); // 之前close了command list，这里要使用到，需要reset操作才可记录command。
 
@@ -337,16 +267,10 @@ void InitAsset()
     ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_CBVHeap)));
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHeapHandle(m_CBVHeap->GetCPUDescriptorHandleForHeapStart());
-    D3D12_CONSTANT_BUFFER_VIEW_DESC objectCbvDesc;
-    objectCbvDesc.BufferLocation = m_objectConstantBuffer->Resource()->GetGPUVirtualAddress();
-    objectCbvDesc.SizeInBytes = d3d12Util::CalcConstantBufferByteSize(sizeof(ObjectConstant));
-    m_device->CreateConstantBufferView(&objectCbvDesc, cbvHeapHandle);
+    m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 0);
     
     cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
-    D3D12_CONSTANT_BUFFER_VIEW_DESC passCbvDesc;
-    passCbvDesc.BufferLocation = m_passConstantBuffer->Resource()->GetGPUVirtualAddress();
-    passCbvDesc.SizeInBytes = d3d12Util::CalcConstantBufferByteSize(sizeof(PassConstant));
-    m_device->CreateConstantBufferView(&passCbvDesc, cbvHeapHandle);
+    m_passConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 0);
 
     CreateRootSignature();
 
@@ -410,11 +334,8 @@ void CreateRootSignature()
     // 一个root parameter可以是root constant，root descriptor，descriptor table
     CD3DX12_ROOT_PARAMETER rootParameters[2];
 
-    CD3DX12_DESCRIPTOR_RANGE objectCbvTable;
-    objectCbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);// 绑定到register(b0)上
-
-    CD3DX12_DESCRIPTOR_RANGE passCbvTable;
-    passCbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);// 绑定到register(b0)上
+    CD3DX12_DESCRIPTOR_RANGE objectCbvTable(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);// 绑定到register(b0)上
+    CD3DX12_DESCRIPTOR_RANGE passCbvTable(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);// 绑定到register(b0)上
 
     rootParameters[0].InitAsDescriptorTable(1, &objectCbvTable);// DescriptorTable: descriptor heap中连续的descriptor
     rootParameters[1].InitAsDescriptorTable(1, &passCbvTable);
@@ -427,6 +348,68 @@ void CreateRootSignature()
     ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
     // 为了性能，root signature要尽可能的小，并且在一帧里面尽量少的去改变它。
+}
+
+void InitGeometries()
+{
+    Vertex cubeVertices[] =
+    {
+        { { -0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Red) },     // left-bottom-front
+        { { -0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Yellow) },   // left-up-front
+        { { 0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Green) },     // right-up-front
+        { { 0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Orange) },   // right-bottom-front
+        { { -0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::Pink) },     // left-bottom-back
+        { { -0.5f, 0.5f, 0.5f }, XMFLOAT4(Colors::Blue) },      // left-up-back
+        { { 0.5f, 0.5f, 0.5f }, XMFLOAT4(Colors::Black) },      // right-up-back
+        { { 0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::White) },     // right-bottom-back
+    };
+
+    std::uint16_t cubeVertexIndices[] =
+    {
+        // front face
+        0, 1, 2,
+        0, 2, 3,
+        // back face
+        4, 6, 5,
+        4, 7, 6,
+        // left face
+        4, 5, 1,
+        4, 1, 0,
+        // right face
+        3, 2, 6,
+        3, 6, 7,
+        // top face
+        1, 5, 6,
+        1, 6, 2,
+        // bottom face
+        4, 0, 3,
+        4, 3, 7,
+    };
+
+    m_vertices.assign(&cubeVertices[0], &cubeVertices[7]);
+    m_indices.assign(&cubeVertexIndices[0], &cubeVertexIndices[35]);
+
+    Vertex pyramidVertices[] =
+    {
+        { { 0, 1, 0 }, XMFLOAT4(Colors::Red) },             // top
+        { { -0.5f, 0, -0.5f }, XMFLOAT4(Colors::Yellow) },  // left-front
+        { { -0.5f, 0, 0.5f }, XMFLOAT4(Colors::Green) },    // left-back
+        { { 0.5f, 0, -0.5f }, XMFLOAT4(Colors::Orange) },   // right-front
+        { { 0.5f, 0, 0.5f }, XMFLOAT4(Colors::Pink) },      // right-back
+    };
+
+    std::uint16_t pyramidVertexIndices[] =
+    {
+        0, 3, 1,    // front face
+        0, 2, 4,    // back face
+        0, 1, 2,    // left face
+        0, 4, 3,    // right face
+        1, 4, 2,    // bottom face
+        1, 3, 4,
+    };
+
+    m_vertices.assign(&pyramidVertices[0], &pyramidVertices[4]);
+    m_indices.assign(&pyramidVertexIndices[0], &pyramidVertexIndices[17]);
 }
 
 void InitStaticObject()
