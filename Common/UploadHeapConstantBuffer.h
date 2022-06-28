@@ -12,10 +12,12 @@ public:
     }
 
     // ´´½¨CBV
-    void CreateConstantBufferView(ID3D12Device* device, const CD3DX12_CPU_DESCRIPTOR_HANDLE& cbvHeapHandle)
+    void CreateConstantBufferView(ID3D12Device* device, const CD3DX12_CPU_DESCRIPTOR_HANDLE& cbvHeapHandle, const UINT index)
     {
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-        cbvDesc.BufferLocation = m_uploadHeapBuffer->GetGPUVirtualAddress();
+        D3D12_GPU_VIRTUAL_ADDRESS startAddress = m_uploadHeapBuffer->GetGPUVirtualAddress();
+        startAddress += index * m_elementByteSize;
+        cbvDesc.BufferLocation = startAddress;
         cbvDesc.SizeInBytes = m_elementByteSize;
         device->CreateConstantBufferView(&cbvDesc, cbvHeapHandle);
     }
