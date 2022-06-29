@@ -234,43 +234,50 @@ void InitAsset()
     };
     D3D12_INPUT_LAYOUT_DESC inputLayout = { inputElementDescs, _countof(inputElementDescs) };
 
-    
+    InitGeometries();
 
     m_commandList->Reset(m_commandAllocator.Get(), nullptr); // 之前close了command list，这里要使用到，需要reset操作才可记录command。
 
     // 确保传输数据操作的Command被执行后，可以释放upload heap的resource，通过ComPtr会自动Release
     ComPtr<ID3D12Resource> vertexUploadBuffer;
-    const UINT cubeVerticesSize = sizeof(cubeVertices);
-    m_vertexBuffer = d3d12Util::CreateDefaultHeapBuffer(m_device.Get(), m_commandList.Get(), cubeVertices, cubeVerticesSize, vertexUploadBuffer);
+    const UINT verticesSize = (UINT)m_vertices.size() * sizeof(Vertex);
+    m_vertexBuffer = d3d12Util::CreateDefaultHeapBuffer(m_device.Get(), m_commandList.Get(), m_vertices.data(), verticesSize, vertexUploadBuffer);
 
     m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-    m_vertexBufferView.SizeInBytes = cubeVerticesSize;
+    m_vertexBufferView.SizeInBytes = verticesSize;
     m_vertexBufferView.StrideInBytes = sizeof(Vertex);
 
     ComPtr<ID3D12Resource> indexUploadBuffer;
-    const UINT cubeVertexIndicesSize = sizeof(cubeVertexIndices);
-    m_indexBuffer = d3d12Util::CreateDefaultHeapBuffer(m_device.Get(), m_commandList.Get(), cubeVertexIndices, cubeVertexIndicesSize, indexUploadBuffer);
+    const UINT vertexIndicesSize = (UINT)m_indices.size() * sizeof(std::uint16_t);;
+    m_indexBuffer = d3d12Util::CreateDefaultHeapBuffer(m_device.Get(), m_commandList.Get(), m_indices.data(), vertexIndicesSize, indexUploadBuffer);
 
     m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-    m_indexBufferView.SizeInBytes = cubeVertexIndicesSize;
+    m_indexBufferView.SizeInBytes = vertexIndicesSize;
     m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 
     // 创建constant buffer
-    m_objectConstantBuffer = std::make_unique<UploadHeapConstantBuffer<ObjectConstant>>(m_device.Get(), 1);
     m_passConstantBuffer = std::make_unique<UploadHeapConstantBuffer<PassConstant>>(m_device.Get(), 1);
+    m_objectConstantBuffer = std::make_unique<UploadHeapConstantBuffer<ObjectConstant>>(m_device.Get(), 4); // 4个Object Constant Buffer
 
     D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
-    cbvHeapDesc.NumDescriptors = 2;
+    cbvHeapDesc.NumDescriptors = 5; // 5个Descriptor
     cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     cbvHeapDesc.NodeMask = 0;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_CBVHeap)));
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHeapHandle(m_CBVHeap->GetCPUDescriptorHandleForHeapStart());
-    m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 0);
-    
-    cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
     m_passConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 0);
+
+    // 4个Object Constant Buffer对应的CBV
+    cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
+    m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 0);
+    cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
+    m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 1);
+    cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
+    m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 2);
+    cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
+    m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 3);
 
     CreateRootSignature();
 
@@ -334,11 +341,10 @@ void CreateRootSignature()
     // 一个root parameter可以是root constant，root descriptor，descriptor table
     CD3DX12_ROOT_PARAMETER rootParameters[2];
 
-    CD3DX12_DESCRIPTOR_RANGE objectCbvTable(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);// 绑定到register(b0)上
-    CD3DX12_DESCRIPTOR_RANGE passCbvTable(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);// 绑定到register(b0)上
-
-    rootParameters[0].InitAsDescriptorTable(1, &objectCbvTable);// DescriptorTable: descriptor heap中连续的descriptor
-    rootParameters[1].InitAsDescriptorTable(1, &passCbvTable);
+    CD3DX12_DESCRIPTOR_RANGE passCbvTable(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0); // register(b0)，后续绑定Pass Constant Buffer
+    CD3DX12_DESCRIPTOR_RANGE objectCbvTable(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);   // register(b1)，后续绑定Object Constant Buffer
+    rootParameters[0].InitAsDescriptorTable(1, &passCbvTable);
+    rootParameters[1].InitAsDescriptorTable(1, &objectCbvTable);
 
     CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
     rootSignatureDesc.Init(2, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -352,7 +358,8 @@ void CreateRootSignature()
 
 void InitGeometries()
 {
-    Vertex cubeVertices[] =
+    // 正方体
+    std::vector<Vertex> cubeVertices =
     {
         { { -0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Red) },     // left-bottom-front
         { { -0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Yellow) },   // left-up-front
@@ -364,7 +371,7 @@ void InitGeometries()
         { { 0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::White) },     // right-bottom-back
     };
 
-    std::uint16_t cubeVertexIndices[] =
+    std::vector<std::uint16_t> cubeVertexIndices =
     {
         // front face
         0, 1, 2,
@@ -386,10 +393,11 @@ void InitGeometries()
         4, 3, 7,
     };
 
-    m_vertices.assign(&cubeVertices[0], &cubeVertices[7]);
-    m_indices.assign(&cubeVertexIndices[0], &cubeVertexIndices[35]);
+    m_vertices.insert(m_vertices.end(), std::begin(cubeVertices), std::end(cubeVertices));
+    m_indices.insert(m_indices.end(), std::begin(cubeVertexIndices), std::end(cubeVertexIndices));
 
-    Vertex pyramidVertices[] =
+    // 四棱锥
+    std::vector<Vertex> pyramidVertices =
     {
         { { 0, 1, 0 }, XMFLOAT4(Colors::Red) },             // top
         { { -0.5f, 0, -0.5f }, XMFLOAT4(Colors::Yellow) },  // left-front
@@ -398,7 +406,7 @@ void InitGeometries()
         { { 0.5f, 0, 0.5f }, XMFLOAT4(Colors::Pink) },      // right-back
     };
 
-    std::uint16_t pyramidVertexIndices[] =
+    std::vector<std::uint16_t> pyramidVertexIndices =
     {
         0, 3, 1,    // front face
         0, 2, 4,    // back face
@@ -408,20 +416,44 @@ void InitGeometries()
         1, 3, 4,
     };
 
-    m_vertices.assign(&pyramidVertices[0], &pyramidVertices[4]);
-    m_indices.assign(&pyramidVertexIndices[0], &pyramidVertexIndices[17]);
+    m_vertices.insert(m_vertices.end(), std::begin(pyramidVertices), std::end(pyramidVertices));
+    m_indices.insert(m_indices.end(), std::begin(pyramidVertexIndices), std::end(pyramidVertexIndices));
 }
 
 void InitStaticObject()
 {
     ObjectConstant objConstants;
     XMMATRIX modelMatrix = XMMATRIX(
-        2, 0, 0, 0,
-        0, 2, 0, 0,
-        0, 0, 2, 0,
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
         0, 0, 0, 1);
     XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
     m_objectConstantBuffer->CopyData(0, objConstants);
+
+    modelMatrix = XMMATRIX(
+        2, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1.5f, 0,
+        3, -2, 0, 1);
+    XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
+    m_objectConstantBuffer->CopyData(1, objConstants);
+
+    modelMatrix = XMMATRIX(
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 2, 1);
+    XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
+    m_objectConstantBuffer->CopyData(2, objConstants);
+
+    modelMatrix = XMMATRIX(
+        0.5f, 0, 0, 0,
+        0, 2, 0, 0,
+        0, 0, 0.5f, 0,
+        -1, -1, 2, 1);
+    XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
+    m_objectConstantBuffer->CopyData(3, objConstants);
 }
 
 void OnUpdate()
@@ -429,7 +461,7 @@ void OnUpdate()
     PassConstant passConstants;
     XMMATRIX projectMatrix = XMMATRIX(
         0.7795, 0.8776, 0.8269, 0.8261,
-        0.0000, 1.2097, -0.4031, -0.4027,
+        0.0000, 2.2097, -0.4031, -0.4027,
         -1.6342, 0.4185, 0.3944, 0.3940,
         0.0000, 0.0000, 4.0040, 5.0000);
     XMStoreFloat4x4(&passConstants.projectMatrix, XMMatrixTranspose(projectMatrix));
@@ -478,10 +510,22 @@ void PopulateCommandList()
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
     CD3DX12_GPU_DESCRIPTOR_HANDLE handle(m_CBVHeap->GetGPUDescriptorHandleForHeapStart());
     m_commandList->SetGraphicsRootDescriptorTable(0, handle);
+
     handle.Offset(m_cbvSrvUavDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(1, handle);
-
     m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+
+    handle.Offset(m_cbvSrvUavDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(1, handle);
+    m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+
+    handle.Offset(m_cbvSrvUavDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(1, handle);
+    m_commandList->DrawIndexedInstanced(18, 1, 36, 8, 0);
+
+    handle.Offset(m_cbvSrvUavDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(1, handle);
+    m_commandList->DrawIndexedInstanced(18, 1, 36, 8, 0);
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_swapChainBuffer[m_currendBackBufferIndex].Get(),
         D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
