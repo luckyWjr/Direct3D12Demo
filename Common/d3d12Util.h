@@ -7,6 +7,7 @@
 #include "../Direct3D12Headers/d3d12.h"
 #include "../Direct3D12Headers/d3dx12.h"
 #include "MathUtil.h"
+#include "GeometryManager.h"
 #include <wrl.h>
 #include <dxgi1_6.h>
 #include <D3Dcompiler.h>

@@ -140,11 +140,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Common\d3d12Util.cpp" />
+    <ClCompile Include="..\Common\GeometryManager.cpp" />
     <ClCompile Include="..\Common\MathUtil.cpp" />
     <ClCompile Include="DrawGeometries.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common\d3d12Util.h" />
+    <ClInclude Include="..\Common\GeometryManager.h" />
     <ClInclude Include="..\Common\MathUtil.h" />
     <ClInclude Include="..\Common\UploadHeapBuffer.h" />
     <ClInclude Include="..\Common\UploadHeapConstantBuffer.h" />

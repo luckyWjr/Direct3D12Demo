@@ -24,12 +24,24 @@
     <ClCompile Include="DrawGeometries.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\GeometryManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common\d3d12Util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\MathUtil.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\UploadHeapBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\UploadHeapConstantBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\GeometryManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

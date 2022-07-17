@@ -57,6 +57,7 @@ D3D12_RECT m_scissorRect;
 
 std::vector<Vertex> m_vertices;
 std::vector<std::uint16_t> m_indices;
+GeometryManager::MeshData m_cubeMeshData, m_pyramidMeshData, m_sphereMeshData;
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -257,10 +258,10 @@ void InitAsset()
 
     // 创建constant buffer
     m_passConstantBuffer = std::make_unique<UploadHeapConstantBuffer<PassConstant>>(m_device.Get(), 1);
-    m_objectConstantBuffer = std::make_unique<UploadHeapConstantBuffer<ObjectConstant>>(m_device.Get(), 4); // 4个Object Constant Buffer
+    m_objectConstantBuffer = std::make_unique<UploadHeapConstantBuffer<ObjectConstant>>(m_device.Get(), 3); // 3个Object Constant Buffer
 
     D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
-    cbvHeapDesc.NumDescriptors = 5; // 5个Descriptor
+    cbvHeapDesc.NumDescriptors = 4; // 4个Descriptor
     cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     cbvHeapDesc.NodeMask = 0;
@@ -269,15 +270,13 @@ void InitAsset()
     CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHeapHandle(m_CBVHeap->GetCPUDescriptorHandleForHeapStart());
     m_passConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 0);
 
-    // 4个Object Constant Buffer对应的CBV
+    // 3个Object Constant Buffer对应的CBV
     cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
     m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 0);
     cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
     m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 1);
     cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
     m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 2);
-    cbvHeapHandle.Offset(1, m_cbvSrvUavDescriptorSize);
-    m_objectConstantBuffer->CreateConstantBufferView(m_device.Get(), cbvHeapHandle, 3);
 
     CreateRootSignature();
 
@@ -358,66 +357,20 @@ void CreateRootSignature()
 
 void InitGeometries()
 {
-    // 正方体
-    std::vector<Vertex> cubeVertices =
-    {
-        { { -0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Red) },     // left-bottom-front
-        { { -0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Yellow) },   // left-up-front
-        { { 0.5f, 0.5f, -0.5f }, XMFLOAT4(Colors::Green) },     // right-up-front
-        { { 0.5f, -0.5f, -0.5f }, XMFLOAT4(Colors::Orange) },   // right-bottom-front
-        { { -0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::Pink) },     // left-bottom-back
-        { { -0.5f, 0.5f, 0.5f }, XMFLOAT4(Colors::Blue) },      // left-up-back
-        { { 0.5f, 0.5f, 0.5f }, XMFLOAT4(Colors::Black) },      // right-up-back
-        { { 0.5f, -0.5f, 0.5f }, XMFLOAT4(Colors::White) },     // right-bottom-back
-    };
+    m_cubeMeshData = GeometryManager::CreateCube(1);
+    m_pyramidMeshData = GeometryManager::CreatePyramid(1, 2);
+    m_sphereMeshData = GeometryManager::CreateSphere(1, 10, 16);
 
-    std::vector<std::uint16_t> cubeVertexIndices =
-    {
-        // front face
-        0, 1, 2,
-        0, 2, 3,
-        // back face
-        4, 6, 5,
-        4, 7, 6,
-        // left face
-        4, 5, 1,
-        4, 1, 0,
-        // right face
-        3, 2, 6,
-        3, 6, 7,
-        // top face
-        1, 5, 6,
-        1, 6, 2,
-        // bottom face
-        4, 0, 3,
-        4, 3, 7,
-    };
+    for (int i = 0; i < m_cubeMeshData.vertices.size(); ++i)
+        m_vertices.push_back(Vertex({ m_cubeMeshData.vertices[i].position, XMFLOAT4(Colors::AliceBlue) }));
+    for (int i = 0; i < m_pyramidMeshData.vertices.size(); ++i)
+        m_vertices.push_back(Vertex({ m_pyramidMeshData.vertices[i].position, XMFLOAT4(Colors::Yellow) }));
+    for (int i = 0; i < m_sphereMeshData.vertices.size(); ++i)
+        m_vertices.push_back(Vertex({ m_sphereMeshData.vertices[i].position, XMFLOAT4(Colors::Orange) }));
 
-    m_vertices.insert(m_vertices.end(), std::begin(cubeVertices), std::end(cubeVertices));
-    m_indices.insert(m_indices.end(), std::begin(cubeVertexIndices), std::end(cubeVertexIndices));
-
-    // 四棱锥
-    std::vector<Vertex> pyramidVertices =
-    {
-        { { 0, 1, 0 }, XMFLOAT4(Colors::Red) },             // top
-        { { -0.5f, 0, -0.5f }, XMFLOAT4(Colors::Yellow) },  // left-front
-        { { -0.5f, 0, 0.5f }, XMFLOAT4(Colors::Green) },    // left-back
-        { { 0.5f, 0, -0.5f }, XMFLOAT4(Colors::Orange) },   // right-front
-        { { 0.5f, 0, 0.5f }, XMFLOAT4(Colors::Pink) },      // right-back
-    };
-
-    std::vector<std::uint16_t> pyramidVertexIndices =
-    {
-        0, 3, 1,    // front face
-        0, 2, 4,    // back face
-        0, 1, 2,    // left face
-        0, 4, 3,    // right face
-        1, 4, 2,    // bottom face
-        1, 3, 4,
-    };
-
-    m_vertices.insert(m_vertices.end(), std::begin(pyramidVertices), std::end(pyramidVertices));
-    m_indices.insert(m_indices.end(), std::begin(pyramidVertexIndices), std::end(pyramidVertexIndices));
+    m_indices.insert(m_indices.end(), std::begin(m_cubeMeshData.indices), std::end(m_cubeMeshData.indices));
+    m_indices.insert(m_indices.end(), std::begin(m_pyramidMeshData.indices), std::end(m_pyramidMeshData.indices));
+    m_indices.insert(m_indices.end(), std::begin(m_sphereMeshData.indices), std::end(m_sphereMeshData.indices));
 }
 
 void InitStaticObject()
@@ -427,7 +380,7 @@ void InitStaticObject()
         1, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 1, 0,
-        0, 0, 0, 1);
+        0.5f, 0, -0.5f, 1);
     XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
     m_objectConstantBuffer->CopyData(0, objConstants);
 
@@ -435,7 +388,7 @@ void InitStaticObject()
         2, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 1.5f, 0,
-        3, -2, 0, 1);
+        4, -2, -0.8f, 1);
     XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
     m_objectConstantBuffer->CopyData(1, objConstants);
 
@@ -446,14 +399,6 @@ void InitStaticObject()
         0, 0, 2, 1);
     XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
     m_objectConstantBuffer->CopyData(2, objConstants);
-
-    modelMatrix = XMMATRIX(
-        0.5f, 0, 0, 0,
-        0, 2, 0, 0,
-        0, 0, 0.5f, 0,
-        -1, -1, 2, 1);
-    XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
-    m_objectConstantBuffer->CopyData(3, objConstants);
 }
 
 void OnUpdate()
@@ -513,19 +458,18 @@ void PopulateCommandList()
 
     handle.Offset(m_cbvSrvUavDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(1, handle);
-    m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+    m_commandList->DrawIndexedInstanced((UINT)m_cubeMeshData.indices.size(), 1, 0, 0, 0);
 
     handle.Offset(m_cbvSrvUavDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(1, handle);
-    m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+    m_commandList->DrawIndexedInstanced((UINT)m_pyramidMeshData.indices.size(), 1, (UINT)m_cubeMeshData.indices.size(),
+        (UINT)m_cubeMeshData.vertices.size(), 0);
 
     handle.Offset(m_cbvSrvUavDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(1, handle);
-    m_commandList->DrawIndexedInstanced(18, 1, 36, 8, 0);
-
-    handle.Offset(m_cbvSrvUavDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(1, handle);
-    m_commandList->DrawIndexedInstanced(18, 1, 36, 8, 0);
+    m_commandList->DrawIndexedInstanced((UINT)m_sphereMeshData.indices.size(), 1,
+        (UINT)m_cubeMeshData.indices.size() + (UINT)m_pyramidMeshData.indices.size(),
+        (UINT)m_cubeMeshData.vertices.size() + (UINT)m_pyramidMeshData.vertices.size(), 0);
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_swapChainBuffer[m_currendBackBufferIndex].Get(),
         D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
