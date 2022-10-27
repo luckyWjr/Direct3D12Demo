@@ -2,6 +2,7 @@
 
 #include <DirectXMath.h>
 #include <vector>
+#include "MathUtil.h"
 
 using namespace DirectX;
 
@@ -14,9 +15,14 @@ public:
     struct Vertex
     {
         Vertex() {}
-        Vertex(const XMFLOAT3& p) :position(p) {}
-        Vertex(float px, float py, float pz) : position(px, py, pz) {}
+        Vertex(const XMFLOAT3& p, const XMFLOAT3& n) : position(p), normal(n) {}
+        Vertex(float px, float py, float pz,
+            float nx, float ny, float nz) :
+            position(px, py, pz), normal(nx, ny, nz) {}
+        Vertex(float px, float py, float pz) :
+            position(px, py, pz), normal(0, 1, 0) {}
         XMFLOAT3 position;
+        XMFLOAT3 normal;
     };
 
     struct MeshData

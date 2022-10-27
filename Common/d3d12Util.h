@@ -6,13 +6,14 @@
 
 #include "../Direct3D12Headers/d3d12.h"
 #include "../Direct3D12Headers/d3dx12.h"
-#include "MathUtil.h"
-#include "GeometryManager.h"
 #include <wrl.h>
 #include <dxgi1_6.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXColors.h>
+
+#include "MathUtil.h"
+#include "GeometryManager.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -52,3 +53,32 @@ public:
     if(FAILED(hr__)) { throw DxException(hr__, L#x, __FILEW__, __LINE__); } \
 }
 #endif
+
+struct Material
+{
+    std::string name;
+    int cbIndex = -1;
+    DirectX::XMFLOAT4 albedo = { 1.0f, 1.0f, 1.0f, 1.0f };
+    DirectX::XMFLOAT3 fresnelR0 = { 0.01f, 0.01f, 0.01f };
+    float roughness = 0.25f;
+};
+
+// ÓÃ×÷constant buffer
+struct MaterialConstant
+{
+    DirectX::XMFLOAT4 albedo = { 1.0f, 1.0f, 1.0f, 1.0f };
+    DirectX::XMFLOAT3 fresnelR0 = { 0.01f, 0.01f, 0.01f };
+    float roughness = 0.25f;
+};
+
+#define MAX_LIGHT_COUNT 16
+
+struct Light
+{
+    DirectX::XMFLOAT3 strength;     // Light color
+    float falloffStart;             // point/spot light only
+    DirectX::XMFLOAT3 direction;    // directional/spot light only
+    float falloffEnd;               // point/spot light only
+    DirectX::XMFLOAT3 Position;     // point/spot light only
+    float spotPower;                // spot light only
+};

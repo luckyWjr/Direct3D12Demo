@@ -11,50 +11,50 @@ GeometryManager::MeshData GeometryManager::CreateCube(float length)
     float halfLength = 0.5f * length;
 
     // 正面
-    vertices[0] = Vertex(-halfLength, -halfLength, -halfLength);
-    vertices[1] = Vertex(-halfLength, +halfLength, -halfLength);
-    vertices[2] = Vertex(+halfLength, +halfLength, -halfLength);
-    vertices[3] = Vertex(+halfLength, -halfLength, -halfLength);
+    vertices[0] = Vertex(-halfLength, -halfLength, -halfLength, 0, 0, -1);
+    vertices[1] = Vertex(-halfLength, +halfLength, -halfLength, 0, 0, -1);
+    vertices[2] = Vertex(+halfLength, +halfLength, -halfLength, 0, 0, -1);
+    vertices[3] = Vertex(+halfLength, -halfLength, -halfLength, 0, 0, -1);
     indices[0] = 0; indices[1] = 1; indices[2] = 2;
     indices[3] = 0; indices[4] = 2; indices[5] = 3;
 
     // 背面
-    vertices[4] = Vertex(-halfLength, -halfLength, +halfLength);
-    vertices[5] = Vertex(+halfLength, -halfLength, +halfLength);
-    vertices[6] = Vertex(+halfLength, +halfLength, +halfLength);
-    vertices[7] = Vertex(-halfLength, +halfLength, +halfLength);
+    vertices[4] = Vertex(-halfLength, -halfLength, +halfLength, 0, 0, 1);
+    vertices[5] = Vertex(+halfLength, -halfLength, +halfLength, 0, 0, 1);
+    vertices[6] = Vertex(+halfLength, +halfLength, +halfLength, 0, 0, 1);
+    vertices[7] = Vertex(-halfLength, +halfLength, +halfLength, 0, 0, 1);
     indices[6] = 4; indices[7] = 5; indices[8] = 6;
     indices[9] = 4; indices[10] = 6; indices[11] = 7;
 
     // 上面
-    vertices[8] = Vertex(-halfLength, +halfLength, -halfLength);
-    vertices[9] = Vertex(-halfLength, +halfLength, +halfLength);
-    vertices[10] = Vertex(+halfLength, +halfLength, +halfLength);
-    vertices[11] = Vertex(+halfLength, +halfLength, -halfLength);
+    vertices[8] = Vertex(-halfLength, +halfLength, -halfLength, 0, 1, 0);
+    vertices[9] = Vertex(-halfLength, +halfLength, +halfLength, 0, 1, 0);
+    vertices[10] = Vertex(+halfLength, +halfLength, +halfLength, 0, 1, 0);
+    vertices[11] = Vertex(+halfLength, +halfLength, -halfLength, 0, 1, 0);
     indices[12] = 8; indices[13] = 9; indices[14] = 10;
     indices[15] = 8; indices[16] = 10; indices[17] = 11;
 
     // 下面
-    vertices[12] = Vertex(-halfLength, -halfLength, -halfLength);
-    vertices[13] = Vertex(+halfLength, -halfLength, -halfLength);
-    vertices[14] = Vertex(+halfLength, -halfLength, +halfLength);
-    vertices[15] = Vertex(-halfLength, -halfLength, +halfLength);
+    vertices[12] = Vertex(-halfLength, -halfLength, -halfLength, 0, -1, 0);
+    vertices[13] = Vertex(+halfLength, -halfLength, -halfLength, 0, -1, 0);
+    vertices[14] = Vertex(+halfLength, -halfLength, +halfLength, 0, -1, 0);
+    vertices[15] = Vertex(-halfLength, -halfLength, +halfLength, 0, -1, 0);
     indices[18] = 12; indices[19] = 13; indices[20] = 14;
     indices[21] = 12; indices[22] = 14; indices[23] = 15;
 
     // 左面
-    vertices[16] = Vertex(-halfLength, -halfLength, +halfLength);
-    vertices[17] = Vertex(-halfLength, +halfLength, +halfLength);
-    vertices[18] = Vertex(-halfLength, +halfLength, -halfLength);
-    vertices[19] = Vertex(-halfLength, -halfLength, -halfLength);
+    vertices[16] = Vertex(-halfLength, -halfLength, +halfLength, -1, 0, 0);
+    vertices[17] = Vertex(-halfLength, +halfLength, +halfLength, -1, 0, 0);
+    vertices[18] = Vertex(-halfLength, +halfLength, -halfLength, -1, 0, 0);
+    vertices[19] = Vertex(-halfLength, -halfLength, -halfLength, -1, 0, 0);
     indices[24] = 16; indices[25] = 17; indices[26] = 18;
     indices[27] = 16; indices[28] = 18; indices[29] = 19;
 
     // 右面
-    vertices[20] = Vertex(+halfLength, -halfLength, -halfLength);
-    vertices[21] = Vertex(+halfLength, +halfLength, -halfLength);
-    vertices[22] = Vertex(+halfLength, +halfLength, +halfLength);
-    vertices[23] = Vertex(+halfLength, -halfLength, +halfLength);
+    vertices[20] = Vertex(+halfLength, -halfLength, -halfLength, 1, 0, 0);
+    vertices[21] = Vertex(+halfLength, +halfLength, -halfLength, 1, 0, 0);
+    vertices[22] = Vertex(+halfLength, +halfLength, +halfLength, 1, 0, 0);
+    vertices[23] = Vertex(+halfLength, -halfLength, +halfLength, 1, 0, 0);
     indices[30] = 20; indices[31] = 21; indices[32] = 22;
     indices[33] = 20; indices[34] = 21; indices[35] = 23;
 
@@ -71,7 +71,7 @@ GeometryManager::MeshData GeometryManager::CreatePyramid(float width, float heig
     uint16 indices[18];
     float halfWidth = 0.5f * width;
 
-    vertices[0] = Vertex(0, height, 0);                 //顶点
+    vertices[0] = Vertex(0, height, 0, 0, 1, 0);        //顶点
     vertices[1] = Vertex(-halfWidth, 0, -halfWidth);    //左前
     vertices[2] = Vertex(-halfWidth, 0, +halfWidth);    //左后
     vertices[3] = Vertex(+halfWidth, 0, -halfWidth);    //右前
@@ -84,6 +84,20 @@ GeometryManager::MeshData GeometryManager::CreatePyramid(float width, float heig
     indices[12] = 1; indices[13] = 4; indices[14] = 2;  // 下面
     indices[15] = 1; indices[16] = 3; indices[17] = 4;  // 下面
 
+    XMVECTOR frontNormal = MathUtil::ComputeNormal(XMLoadFloat3(&vertices[0].position), XMLoadFloat3(&vertices[3].position), XMLoadFloat3(&vertices[1].position));
+    XMVECTOR backNormal = MathUtil::ComputeNormal(XMLoadFloat3(&vertices[0].position), XMLoadFloat3(&vertices[2].position), XMLoadFloat3(&vertices[4].position));
+    XMVECTOR leftNormal = MathUtil::ComputeNormal(XMLoadFloat3(&vertices[0].position), XMLoadFloat3(&vertices[1].position), XMLoadFloat3(&vertices[2].position));
+    XMVECTOR rightNormal = MathUtil::ComputeNormal(XMLoadFloat3(&vertices[0].position), XMLoadFloat3(&vertices[4].position), XMLoadFloat3(&vertices[3].position));
+    XMVECTOR bottomNormal = XMVectorSet(0, -1, 0, 0);
+    XMVECTOR leftFrontVertexNormal = XMVector3Normalize(bottomNormal + leftNormal + frontNormal);
+    XMVECTOR leftBackVertexNormal = XMVector3Normalize(bottomNormal + leftNormal + backNormal);
+    XMVECTOR rightFrontVertexNormal = XMVector3Normalize(bottomNormal + rightNormal + frontNormal);
+    XMVECTOR rightBackVertexNormal = XMVector3Normalize(bottomNormal + rightNormal + backNormal);
+    XMStoreFloat3(&vertices[1].normal, leftFrontVertexNormal);
+    XMStoreFloat3(&vertices[2].normal, leftBackVertexNormal);
+    XMStoreFloat3(&vertices[3].normal, rightFrontVertexNormal);
+    XMStoreFloat3(&vertices[4].normal, rightBackVertexNormal);
+
     meshData.vertices.assign(&vertices[0], &vertices[5]);
     meshData.indices.assign(&indices[0], &indices[18]);
 
@@ -94,8 +108,8 @@ GeometryManager::MeshData GeometryManager::CreateSphere(float radius, uint16 sta
 {
     MeshData meshData;
 
-    Vertex topVertex(0.0f, radius, 0.0f);       // 北极点
-    Vertex bottomVertex(0.0f, -radius, 0.0f);   // 南极点
+    Vertex topVertex(0.0f, radius, 0.0f, 0.0f, +1.0f, 0.0f);       // 北极点
+    Vertex bottomVertex(0.0f, -radius, 0.0f, 0.0f, -1.0f, 0.0f);   // 南极点
 
     meshData.vertices.push_back(topVertex);
 
@@ -114,6 +128,9 @@ GeometryManager::MeshData GeometryManager::CreateSphere(float radius, uint16 sta
             v.position.x = radius * sinf(stackRadian) * cosf(sliceRadian);
             v.position.y = radius * cosf(stackRadian);
             v.position.z = radius * sinf(stackRadian) * sinf(sliceRadian);
+
+            XMVECTOR normal = XMLoadFloat3(&v.position);
+            XMStoreFloat3(&v.normal, XMVector3Normalize(normal));
 
             meshData.vertices.push_back(v);
         }
