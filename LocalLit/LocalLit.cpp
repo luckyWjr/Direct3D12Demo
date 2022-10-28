@@ -453,14 +453,15 @@ void OnUpdate()
     // 点光源
     passConstants.lights[1].strength = { 1.0f, 0.0f, 0.0f };
     passConstants.lights[1].falloffStart = 0;
-    passConstants.lights[1].falloffEnd = 10;
-    passConstants.lights[1].Position = { 2.0f, 2.0f, -2.0f };
+    passConstants.lights[1].falloffEnd = 15;
+    passConstants.lights[1].Position = { 3.0f, 1.5f, -1.5f };
+
     // 聚光灯
     passConstants.lights[2].strength = { 0.0f, 1.0f, 0.0f };
     passConstants.lights[2].falloffStart = 0;
-    passConstants.lights[2].falloffEnd = 60;
-    passConstants.lights[2].Position = { -3.0f, 2.0f, -3.0f };
-    XMStoreFloat3(&passConstants.lights[2].direction, XMVector3Normalize(XMVectorSet(3.0f, -2.0f, 3.0f, 1.0f)));
+    passConstants.lights[2].falloffEnd = 40;
+    passConstants.lights[2].Position = { -3.0f, 2.0f, -5.0f };
+    XMStoreFloat3(&passConstants.lights[2].direction, XMVector3Normalize(XMVectorSet(1.0f, -1.0f, 1.0f, 1.0f)));
     passConstants.lights[2].spotPower = 16;
 
     m_passConstantBuffer->CopyData(0, passConstants);

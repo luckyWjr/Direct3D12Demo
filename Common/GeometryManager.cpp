@@ -67,38 +67,62 @@ GeometryManager::MeshData GeometryManager::CreateCube(float length)
 GeometryManager::MeshData GeometryManager::CreatePyramid(float width, float height)
 {
     MeshData meshData;
-    Vertex vertices[5];
+    Vertex vertices[16];
     uint16 indices[18];
     float halfWidth = 0.5f * width;
 
-    vertices[0] = Vertex(0, height, 0, 0, 1, 0);        //顶点
-    vertices[1] = Vertex(-halfWidth, 0, -halfWidth);    //左前
-    vertices[2] = Vertex(-halfWidth, 0, +halfWidth);    //左后
-    vertices[3] = Vertex(+halfWidth, 0, -halfWidth);    //右前
-    vertices[4] = Vertex(+halfWidth, 0, +halfWidth);    //右后
+    // 五个顶点的坐标
+    XMFLOAT3 top(0.0f, height, 0.0f);                   //顶点
+    XMFLOAT3 leftFront(-halfWidth, 0.0f, -halfWidth);   //左前
+    XMFLOAT3 leftBack(-halfWidth, 0.0f, +halfWidth);    //左后
+    XMFLOAT3 rightFront(+halfWidth, 0.0f, -halfWidth);  //右前
+    XMFLOAT3 rightBack(+halfWidth, 0.0f, +halfWidth);   //右后
 
-    indices[0] = 0; indices[1] = 3; indices[2] = 1;     // 正面
-    indices[3] = 0; indices[4] = 2; indices[5] = 4;     // 背面
-    indices[6] = 0; indices[7] = 1; indices[8] = 2;     // 左面
-    indices[9] = 0; indices[10] = 4; indices[11] = 3;   // 右面
-    indices[12] = 1; indices[13] = 4; indices[14] = 2;  // 下面
-    indices[15] = 1; indices[16] = 3; indices[17] = 4;  // 下面
+    XMFLOAT3 normalFloat3;
+    XMVECTOR normalVector;
 
-    XMVECTOR frontNormal = MathUtil::ComputeNormal(XMLoadFloat3(&vertices[0].position), XMLoadFloat3(&vertices[3].position), XMLoadFloat3(&vertices[1].position));
-    XMVECTOR backNormal = MathUtil::ComputeNormal(XMLoadFloat3(&vertices[0].position), XMLoadFloat3(&vertices[2].position), XMLoadFloat3(&vertices[4].position));
-    XMVECTOR leftNormal = MathUtil::ComputeNormal(XMLoadFloat3(&vertices[0].position), XMLoadFloat3(&vertices[1].position), XMLoadFloat3(&vertices[2].position));
-    XMVECTOR rightNormal = MathUtil::ComputeNormal(XMLoadFloat3(&vertices[0].position), XMLoadFloat3(&vertices[4].position), XMLoadFloat3(&vertices[3].position));
-    XMVECTOR bottomNormal = XMVectorSet(0, -1, 0, 0);
-    XMVECTOR leftFrontVertexNormal = XMVector3Normalize(bottomNormal + leftNormal + frontNormal);
-    XMVECTOR leftBackVertexNormal = XMVector3Normalize(bottomNormal + leftNormal + backNormal);
-    XMVECTOR rightFrontVertexNormal = XMVector3Normalize(bottomNormal + rightNormal + frontNormal);
-    XMVECTOR rightBackVertexNormal = XMVector3Normalize(bottomNormal + rightNormal + backNormal);
-    XMStoreFloat3(&vertices[1].normal, leftFrontVertexNormal);
-    XMStoreFloat3(&vertices[2].normal, leftBackVertexNormal);
-    XMStoreFloat3(&vertices[3].normal, rightFrontVertexNormal);
-    XMStoreFloat3(&vertices[4].normal, rightBackVertexNormal);
+    // 正面三角形
+    normalVector = MathUtil::ComputeNormal(XMLoadFloat3(&top), XMLoadFloat3(&rightFront), XMLoadFloat3(&leftFront));
+    XMStoreFloat3(&normalFloat3, normalVector);
+    vertices[0] = Vertex(top, normalFloat3);
+    vertices[1] = Vertex(rightFront, normalFloat3);
+    vertices[2] = Vertex(leftFront, normalFloat3);
+    indices[0] = 0; indices[1] = 1; indices[2] = 2;
 
-    meshData.vertices.assign(&vertices[0], &vertices[5]);
+    // 背面三角形
+    normalVector = MathUtil::ComputeNormal(XMLoadFloat3(&top), XMLoadFloat3(&leftBack), XMLoadFloat3(&rightBack));
+    XMStoreFloat3(&normalFloat3, normalVector);
+    vertices[3] = Vertex(top, normalFloat3);
+    vertices[4] = Vertex(leftBack, normalFloat3);
+    vertices[5] = Vertex(rightBack, normalFloat3);
+    indices[3] = 3; indices[4] = 4; indices[5] = 5;
+
+    // 左面三角形
+    normalVector = MathUtil::ComputeNormal(XMLoadFloat3(&top), XMLoadFloat3(&leftFront), XMLoadFloat3(&leftBack));
+    XMStoreFloat3(&normalFloat3, normalVector);
+    vertices[6] = Vertex(top, normalFloat3);
+    vertices[7] = Vertex(leftFront, normalFloat3);
+    vertices[8] = Vertex(leftBack, normalFloat3);
+    indices[6] = 6; indices[7] = 7; indices[8] = 8;
+
+    // 右面三角形
+    normalVector = MathUtil::ComputeNormal(XMLoadFloat3(&top), XMLoadFloat3(&rightBack), XMLoadFloat3(&rightFront));
+    XMStoreFloat3(&normalFloat3, normalVector);
+    vertices[9] = Vertex(top, normalFloat3);
+    vertices[10] = Vertex(rightBack, normalFloat3);
+    vertices[11] = Vertex(rightFront, normalFloat3);
+    indices[9] = 9; indices[10] = 10; indices[11] = 11;
+
+    // 下面两个三角形
+    normalFloat3 = XMFLOAT3(0.0f, -1.0f, 0.0f);
+    vertices[12] = Vertex(leftFront, normalFloat3);
+    vertices[13] = Vertex(rightFront, normalFloat3);
+    vertices[14] = Vertex(rightBack, normalFloat3);
+    vertices[15] = Vertex(leftFront, normalFloat3);
+    indices[12] = 12; indices[13] = 13; indices[14] = 14;
+    indices[15] = 12; indices[16] = 14; indices[17] = 15;
+
+    meshData.vertices.assign(&vertices[0], &vertices[16]);
     meshData.indices.assign(&indices[0], &indices[18]);
 
     return meshData;
