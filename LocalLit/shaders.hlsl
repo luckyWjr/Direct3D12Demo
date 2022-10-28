@@ -3,10 +3,10 @@
 #define NUM_DIRECT_LIGHTS 1
 #endif
 #ifndef NUM_POINT_LIGHTS
-#define NUM_POINT_LIGHTS 0
+#define NUM_POINT_LIGHTS 1
 #endif
 #ifndef NUM_SPOT_LIGHTS
-#define NUM_SPOT_LIGHTS 0
+#define NUM_SPOT_LIGHTS 1
 #endif
 
 #include "../CommonShader/LightingUtil.hlsl"
@@ -31,6 +31,7 @@ cbuffer passData : register(b0)
 cbuffer objectData : register(b1)
 {
     float4x4 modelMatrix;
+    float4x4 normalMatrix;
 }
 
 cbuffer materialData : register(b2)
@@ -47,7 +48,7 @@ PSInput VSMain(float3 position : POSITION, float3 normal : NORMAL)
     float4 positionInWorld = mul(float4(position, 1.0f), modelMatrix);
     result.positionInWorld = positionInWorld.xyz;
     // 顶点的法线在世界坐标下的值
-    result.normalInWorld = mul(normal, (float3x3)modelMatrix);
+    result.normalInWorld = mul(normal, (float3x3)normalMatrix);
     // 顶点在齐次裁剪空间下的位置
     result.position = mul(positionInWorld, mul(viewMatrix, projectMatrix));
 
@@ -58,14 +59,14 @@ float4 PSMain(PSInput input) : SV_TARGET
 {
     // 归一化法线向量
     input.normalInWorld = normalize(input.normalInWorld);
-// 表面到camera的单位向量
-float3 toCamera = normalize(cameraPositionInWorld - input.positionInWorld);
-// 环境光照，模拟间接光
-float4 ambient = ambientLight * albedo;
-Material material = { albedo, fresnelR0, roughness };
-// 直接光，包含漫反射和镜面反射
-float4 directLight = ComputeLighting(lights, material, input.positionInWorld, input.normalInWorld, toCamera);
-float4 litColor = ambient + directLight;
-litColor.a = albedo.a;
-return litColor;
+    // 表面到camera的单位向量
+    float3 toCamera = normalize(cameraPositionInWorld - input.positionInWorld);
+    // 环境光照，模拟间接光
+    float4 ambient = ambientLight * albedo;
+    Material material = { albedo, fresnelR0, roughness };
+    // 直接光，包含漫反射和镜面反射
+    float4 directLight = ComputeLighting(lights, material, input.positionInWorld, input.normalInWorld, toCamera);
+    float4 litColor = ambient + directLight;
+    litColor.a = albedo.a;
+    return litColor;
 }

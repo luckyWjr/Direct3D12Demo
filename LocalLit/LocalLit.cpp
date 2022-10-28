@@ -16,6 +16,7 @@ struct Vertex
 struct ObjectConstant
 {
     XMFLOAT4X4 modelMatrix = MathUtil::Identity4x4();
+    XMFLOAT4X4 normalMatrix = MathUtil::Identity4x4();
 };
 
 struct PassConstant
@@ -403,6 +404,7 @@ void InitStaticObject()
         0, 0, 1, 0,
         0.5f, 0, -0.5f, 1);
     XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
+    XMStoreFloat4x4(&objConstants.normalMatrix, XMMatrixTranspose(modelMatrix));
     m_objectConstantBuffer->CopyData(0, objConstants);
 
     modelMatrix = XMMATRIX(
@@ -411,6 +413,7 @@ void InitStaticObject()
         0, 0, 1.5f, 0,
         2.5f, -1.2f, -0.5f, 1);
     XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
+    XMStoreFloat4x4(&objConstants.normalMatrix, XMMatrixTranspose(MathUtil::InverseTranspose(modelMatrix)));
     m_objectConstantBuffer->CopyData(1, objConstants);
 
     modelMatrix = XMMATRIX(
@@ -419,6 +422,7 @@ void InitStaticObject()
         0, 0, 1, 0,
         0, 0, 2, 1);
     XMStoreFloat4x4(&objConstants.modelMatrix, XMMatrixTranspose(modelMatrix));
+    XMStoreFloat4x4(&objConstants.normalMatrix, XMMatrixTranspose(modelMatrix));
     m_objectConstantBuffer->CopyData(2, objConstants);
 }
 
@@ -439,10 +443,25 @@ void OnUpdate()
     XMMATRIX projectMatrix = XMMatrixPerspectiveFovLH(fovAngleY, aspectRatio, nearZ, farZ);
     XMStoreFloat4x4(&passConstants.projectMatrix, XMMatrixTranspose(projectMatrix));
 
-    // 设置光源和间接光数据
+    // 设间接光
     passConstants.ambientLight = { 0.3f, 0.3f, 0.3f, 1.0f };
+
+    // 平行光
     XMStoreFloat3(&passConstants.lights[0].direction, XMVector3Normalize(XMVectorSet(3.0f, -4.0f, -2.0f, 1.0f)));
     passConstants.lights[0].strength = { 1.0f, 1.0f, 1.0f };
+
+    // 点光源
+    passConstants.lights[1].strength = { 1.0f, 0.0f, 0.0f };
+    passConstants.lights[1].falloffStart = 0;
+    passConstants.lights[1].falloffEnd = 10;
+    passConstants.lights[1].Position = { 2.0f, 2.0f, -2.0f };
+    // 聚光灯
+    passConstants.lights[2].strength = { 0.0f, 1.0f, 0.0f };
+    passConstants.lights[2].falloffStart = 0;
+    passConstants.lights[2].falloffEnd = 60;
+    passConstants.lights[2].Position = { -3.0f, 2.0f, -3.0f };
+    XMStoreFloat3(&passConstants.lights[2].direction, XMVector3Normalize(XMVectorSet(3.0f, -2.0f, 3.0f, 1.0f)));
+    passConstants.lights[2].spotPower = 16;
 
     m_passConstantBuffer->CopyData(0, passConstants);
 }
@@ -530,21 +549,21 @@ void InitMaterials()
     cube->name = "cube";
     cube->cbIndex = 0;
     cube->albedo = XMFLOAT4(Colors::LightBlue);
-    cube->fresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
+    cube->fresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
     cube->roughness = 0.1f;
 
     auto pyramid = std::make_unique<Material>();
     pyramid->name = "pyramid";
     pyramid->cbIndex = 1;
     pyramid->albedo = XMFLOAT4(Colors::Yellow);
-    pyramid->fresnelR0 = XMFLOAT3(0.5f, 0.5f, 0.5f);
+    pyramid->fresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
     pyramid->roughness = 0.2f;
 
     auto sphere = std::make_unique<Material>();
     sphere->name = "sphere";
     sphere->cbIndex = 2;
     sphere->albedo = XMFLOAT4(Colors::Orange);
-    sphere->fresnelR0 = XMFLOAT3(0.8f, 0.8f, 0.8f);
+    sphere->fresnelR0 = XMFLOAT3(0.08f, 0.08f, 0.08f);
     sphere->roughness = 0.3f;
 
     m_materials["cube"] = std::move(cube);
