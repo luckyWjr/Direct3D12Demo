@@ -21,13 +21,13 @@
     <ClCompile Include="..\Common\MathUtil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DrawGeometries.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\Common\GameTimer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\Common\GeometryManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LocalLit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -102,7 +102,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     m_hwnd = CreateWindowEx(
         0,                              // Optional window styles.
         CLASS_NAME,                     // Window class
-        L"Draw Geometries",    // Window text
+        L"Local Lit",                   // Window text
         WS_OVERLAPPEDWINDOW,            // Window style
         CW_USEDEFAULT, CW_USEDEFAULT,   // 窗口大小
         m_clientWidth, m_clientHeight,  // 窗口位置
