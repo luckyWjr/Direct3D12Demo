@@ -29,6 +29,7 @@ public:
     static ComPtr<ID3DBlob> LoadBinary(const std::wstring& filename);
     static ComPtr<ID3D12Resource> CreateDefaultHeapBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const void* data,
         const int size, ComPtr<ID3D12Resource>& uploadBuffer);
+    static std::wstring GetLatestWinPixGpuCapturerPath();
 };
 
 class DxException
