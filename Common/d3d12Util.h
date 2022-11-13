@@ -11,6 +11,7 @@
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXColors.h>
+#include <unordered_map>
 
 #include "MathUtil.h"
 #include "GeometryManager.h"
@@ -54,6 +55,62 @@ public:
     if(FAILED(hr__)) { throw DxException(hr__, L#x, __FILEW__, __LINE__); } \
 }
 #endif
+
+// DrawIndexedInstanced对应的参数
+struct Submesh
+{
+	UINT indexCount = 0;			// 物体的index数量
+	UINT startIndexLocation = 0;	// 在index buffer中的起始位置
+	INT baseVertexLocation = 0;		// 偏移量
+};
+
+struct Mesh
+{
+	std::string name;
+
+	// 顶点和下标信息在CPU中的内存块。使用时，根据实际情况强转成std::vector<Vertex>、std::vector<std::uint16_t>、std::vector<std::uint32_t>等
+	ComPtr<ID3DBlob> vertexBufferCPU = nullptr;
+	ComPtr<ID3DBlob> indexBufferCPU = nullptr;
+
+	ComPtr<ID3D12Resource> vertexBufferGPU = nullptr;
+	ComPtr<ID3D12Resource> indexBufferGPU = nullptr;
+
+	// 通过Upload heap里的Resource将cpu数据传到default heap中
+	ComPtr<ID3D12Resource> vertexBufferUploader = nullptr;
+	ComPtr<ID3D12Resource> indexBufferUploader = nullptr;
+
+	UINT vertexByteStride = 0;											// vertex buffer每个元素占用的字节大小
+	UINT vertexBufferSize = 0;											// vertex buffer总共占用的字节大小
+	DXGI_FORMAT indexFormat = DXGI_FORMAT_R16_UINT;						// index buffer中每个元素的format（DXGI_FORMAT_R16_UINT 或 DXGI_FORMAT_R32_UINT）
+	UINT indexBufferSize = 0;											// index buffer总共占用的字节大小
+
+	std::unordered_map<std::string, Submesh> drawArgs;
+
+	D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView()const
+	{
+		D3D12_VERTEX_BUFFER_VIEW vbv;
+		vbv.BufferLocation = vertexBufferGPU->GetGPUVirtualAddress();
+		vbv.StrideInBytes = vertexByteStride;
+		vbv.SizeInBytes = vertexBufferSize;
+		return vbv;
+	}
+
+	D3D12_INDEX_BUFFER_VIEW GetIndexBufferView()const
+	{
+		D3D12_INDEX_BUFFER_VIEW ibv;
+		ibv.BufferLocation = indexBufferGPU->GetGPUVirtualAddress();
+		ibv.Format = indexFormat;
+		ibv.SizeInBytes = indexBufferSize;
+		return ibv;
+	}
+
+	// 从upload heap传输到default deap后，可以将upload heap中的Resource释放掉
+	void DisposeUploaders()
+	{
+		vertexBufferUploader = nullptr;
+		indexBufferUploader = nullptr;
+	}
+};
 
 struct Material
 {
