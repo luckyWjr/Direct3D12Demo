@@ -487,16 +487,6 @@ void InitRenderItems()
     sphereItem->startIndexLocation = sphereItem->mesh->drawArgs["sphere"].startIndexLocation;
     sphereItem->baseVertexLocation = sphereItem->mesh->drawArgs["sphere"].baseVertexLocation;
     m_renderItems.push_back(std::move(sphereItem));
-
-    m_objectConstantBuffer = std::make_unique<UploadHeapConstantBuffer<ObjectConstant>>(m_device.Get(), m_renderItems.size());
-    // 设置Object Constant Buffer
-    for (auto& item : m_renderItems)
-    {
-        XMMATRIX world = XMLoadFloat4x4(&item->modelMatrix);
-        ObjectConstant objectConstant;
-        XMStoreFloat4x4(&objectConstant.modelMatrix, XMMatrixTranspose(world));
-        m_objectConstantBuffer->CopyData(item->objectCBIndex, objectConstant);
-    }
 }
 
 void InitConstantBuffer()
@@ -505,7 +495,7 @@ void InitConstantBuffer()
     m_passConstantBuffer = std::make_unique<UploadHeapConstantBuffer<PassConstant>>(m_device.Get(), 1);
 
     // 创建、设置Object Constant Buffer
-    m_objectConstantBuffer = std::make_unique<UploadHeapConstantBuffer<ObjectConstant>>(m_device.Get(), m_renderItems.size());
+    m_objectConstantBuffer = std::make_unique<UploadHeapConstantBuffer<ObjectConstant>>(m_device.Get(), (UINT)m_renderItems.size());
     for (auto& item : m_renderItems)
     {
         XMMATRIX world = XMLoadFloat4x4(&item->modelMatrix);
@@ -515,7 +505,7 @@ void InitConstantBuffer()
     }
 
     // 创建、设置Material Constant Buffer
-    m_materialConstantBuffer = std::make_unique<UploadHeapConstantBuffer<MaterialConstant>>(m_device.Get(), m_materials.size());
+    m_materialConstantBuffer = std::make_unique<UploadHeapConstantBuffer<MaterialConstant>>(m_device.Get(), (UINT)m_materials.size());
     for (auto& e : m_materials)
     {
         Material* mat = e.second.get();
