@@ -42,9 +42,9 @@ public:
     {
         // º∆À„Àı∑≈æÿ’ÛµƒƒÊæÿ’Û
         XMMATRIX InverseS = S;
-        InverseS.r[0] = XMVectorSet(1.0 / XMVectorGetX(InverseS.r[0]), 0.0f, 0.0f, 0.0f);
-        InverseS.r[1] = XMVectorSet(0.0f, 1.0 / XMVectorGetY(InverseS.r[1]), 0.0f, 0.0f);
-        InverseS.r[2] = XMVectorSet(0.0f, 0.0f, 1.0 / XMVectorGetZ(InverseS.r[2]), 0.0f);
+        InverseS.r[0] = XMVectorSet(1.0f / XMVectorGetX(InverseS.r[0]), 0.0f, 0.0f, 0.0f);
+        InverseS.r[1] = XMVectorSet(0.0f, 1.0f / XMVectorGetY(InverseS.r[1]), 0.0f, 0.0f);
+        InverseS.r[2] = XMVectorSet(0.0f, 0.0f, 1.0f / XMVectorGetZ(InverseS.r[2]), 0.0f);
 
         return XMMatrixMultiply(R, InverseS);
     }

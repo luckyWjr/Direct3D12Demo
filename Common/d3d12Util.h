@@ -6,12 +6,14 @@
 
 #include "../Direct3D12Headers/d3d12.h"
 #include "../Direct3D12Headers/d3dx12.h"
+#include "../DirectXTK//DDSTextureLoader.h"
 #include <wrl.h>
 #include <dxgi1_6.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXColors.h>
 #include <unordered_map>
+#include <array>
 
 #include "MathUtil.h"
 #include "GeometryManager.h"
@@ -119,6 +121,9 @@ struct Material
     DirectX::XMFLOAT4 albedo = { 1.0f, 1.0f, 1.0f, 1.0f };
     DirectX::XMFLOAT3 fresnelR0 = { 0.01f, 0.01f, 0.01f };
     float roughness = 0.25f;
+
+	// albedo texture的下标
+	int albedoTextureIndex = -1;
 };
 
 // 用作constant buffer
@@ -127,6 +132,14 @@ struct MaterialConstant
     DirectX::XMFLOAT4 albedo = { 1.0f, 1.0f, 1.0f, 1.0f };
     DirectX::XMFLOAT3 fresnelR0 = { 0.01f, 0.01f, 0.01f };
     float roughness = 0.25f;
+};
+
+struct Texture
+{
+	std::string name;
+	std::wstring fileName;
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> uploader = nullptr;
 };
 
 #define MAX_LIGHT_COUNT 16
